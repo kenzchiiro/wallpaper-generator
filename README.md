@@ -18,7 +18,7 @@ Open `index.html` in any modern browser — no install needed.
 
 ---
 
-ถ้าชอบและอยากสนับสนุน ขอบคุณมากเลยนะครับ ☕
+If you find this useful, feel free to support — it means a lot! ☕
 
 <a href="https://www.buymeacoffee.com/kenzchiro" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 40px !important;width: 145px !important;" ></a>
 

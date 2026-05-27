@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wallpaper Generator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;500;600;700;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #080808;
+    --surface: #111111;
+    --surface2: #1a1a1a;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #e8e8e8;
+    --text2: #888;
+    --text3: #555;
+    --accent: #c8c8c8;
+    --accent2: #ffffff;
+    --transition: 0.18s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'DM Mono', monospace; font-size: 12px; overflow: hidden; }
+  .app { display: grid; grid-template-columns: 320px 1fr; grid-template-rows: 48px 1fr; height: 100vh; }
+
+  /* ── TOPBAR ── */
+  .topbar { grid-column: 1/-1; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; border-bottom: 1px solid var(--border); background: var(--surface); }
+  .topbar-logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 15px; letter-spacing: -0.02em; color: var(--accent2); }
+  .topbar-logo span { color: var(--text3); }
+  .topbar-actions { display: flex; gap: 8px; }
+
+  /* ── PANEL ── */
+  .panel { background: var(--surface); border-right: 1px solid var(--border); overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
+  .panel::-webkit-scrollbar { width: 4px; }
+  .panel::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .section { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+  .section-label { font-family: 'Syne', sans-serif; font-weight: 600; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text3); margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .section-label::after { content:''; flex:1; height:1px; background: var(--border); }
+
+  /* Toggle */
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .toggle-label { color: var(--text2); }
+  .toggle { position: relative; width: 38px; height: 20px; cursor: pointer; flex-shrink: 0; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-track { position: absolute; inset: 0; background: var(--surface2); border: 1px solid var(--border2); border-radius: 10px; transition: var(--transition); }
+  .toggle input:checked + .toggle-track { background: #2a2a2a; border-color: rgba(255,255,255,0.25); }
+  .toggle-thumb { position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; background: var(--text3); border-radius: 50%; transition: var(--transition); }
+  .toggle input:checked ~ .toggle-thumb { left: 21px; background: var(--accent2); }
+
+  /* Segmented */
+  .seg { display: flex; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 3px; gap: 2px; margin-bottom: 10px; }
+  .seg-btn { flex: 1; padding: 5px 6px; border: none; background: transparent; color: var(--text3); font-family: 'DM Mono', monospace; font-size: 11px; border-radius: 6px; cursor: pointer; transition: var(--transition); white-space: nowrap; }
+  .seg-btn.active { background: var(--surface); color: var(--accent2); box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+
+  /* Slider */
+  .slider-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .slider-label { color: var(--text2); min-width: 65px; }
+  .slider-value { color: var(--accent); min-width: 32px; text-align: right; font-size: 11px; }
+  input[type=range] { flex: 1; -webkit-appearance: none; height: 2px; background: var(--border2); border-radius: 1px; outline: none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; background: var(--accent2); border-radius: 50%; cursor: pointer; box-shadow: 0 0 0 2px rgba(0,0,0,0.6); transition: transform 0.1s; }
+  input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+  /* Global color rows */
+  .color-row { display: flex; flex-direction: column; gap: 7px; }
+  .color-item { display: flex; align-items: center; gap: 10px; }
+  .color-swatch { width: 24px; height: 24px; border-radius: 5px; border: 1px solid var(--border2); cursor: pointer; position: relative; overflow: hidden; flex-shrink: 0; transition: transform 0.15s; }
+  .color-swatch:hover { transform: scale(1.1); }
+  .color-swatch input[type=color] { position: absolute; inset: -4px; opacity: 0; cursor: pointer; width: 200%; height: 200%; }
+  .color-item-label { color: var(--text2); flex: 1; }
+  .color-item-hex { color: var(--text3); font-size: 10px; }
+
+  /* ── PRESET CHIPS ── */
+  .preset-category { font-family: 'Syne', sans-serif; font-size: 9px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text3); margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+  .preset-category::after { content:''; flex:1; height:1px; background: var(--border); }
+  .preset-cat-badge { font-size: 8px; padding: 1px 5px; border-radius: 3px; font-weight: 600; letter-spacing: 0.06em; }
+  .cat-glass { background: rgba(100,150,255,0.12); color: #7799ff; }
+  .cat-solid { background: rgba(255,180,50,0.12); color: #ffaa44; }
+
+  .palette-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 10px; }
+  .palette-chip {
+    height: 38px; border-radius: 5px;
+    border: 1px solid rgba(255,255,255,0.06);
+    cursor: pointer; transition: border-color 0.15s, opacity 0.15s;
+    position: relative; overflow: hidden;
+  }
+  .palette-chip:hover { border-color: rgba(255,255,255,0.16); opacity: 0.92; }
+  .palette-chip.active { border-color: rgba(255,255,255,0.35); }
+  .chip-label {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    padding: 2px 4px 4px;
+    font-family: 'DM Mono', monospace; font-size: 8px; font-weight: 400;
+    color: rgba(255,255,255,0.7); text-align: center;
+    background: linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 100%);
+    letter-spacing: 0.03em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* ── SHAPE PALETTE ── */
+  .shape-palette-wrap { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; align-items: center; }
+  .spc-swatch { position: relative; width: 30px; height: 30px; border-radius: 7px; border: 1px solid var(--border2); cursor: pointer; flex-shrink: 0; transition: transform 0.15s, border-color 0.15s; overflow: visible; }
+  .spc-swatch:hover { transform: scale(1.08); border-color: rgba(255,255,255,0.25); }
+  .spc-swatch input[type=color] { position: absolute; inset: -2px; opacity: 0; cursor: pointer; width: 120%; height: 120%; }
+  .spc-remove { position: absolute; top: -5px; right: -5px; width: 13px; height: 13px; background: #2a2a2a; border: 1px solid var(--border2); border-radius: 50%; font-size: 8px; line-height: 1; color: var(--text3); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 5; transition: background 0.12s, color 0.12s; }
+  .spc-remove:hover { background: #550000; color: #ff8888; border-color: #882222; }
+  .spc-add { width: 30px; height: 30px; border-radius: 7px; border: 1px dashed var(--border2); background: transparent; color: var(--text3); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: var(--transition); }
+  .spc-add:hover { border-color: rgba(255,255,255,0.25); color: var(--accent2); }
+
+  /* Export */
+  .export-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 10px; }
+  .export-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; color: var(--text2); font-family: 'DM Mono', monospace; font-size: 10px; cursor: pointer; transition: var(--transition); text-align: left; line-height: 1.4; }
+  .export-btn:hover { border-color: var(--border2); color: var(--accent2); background: rgba(255,255,255,0.03); }
+  .export-btn.sel { border-color: rgba(255,255,255,0.22); color: var(--accent2); }
+  .export-btn strong { display: block; font-size: 11px; color: var(--text); margin-bottom: 1px; }
+
+  /* Buttons */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 8px; border: 1px solid var(--border2); background: transparent; color: var(--text); font-family: 'DM Mono', monospace; font-size: 11px; cursor: pointer; transition: var(--transition); }
+  .btn:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.2); }
+  .btn-primary { background: var(--accent2); color: #000; border-color: var(--accent2); font-weight: 500; }
+  .btn-primary:hover { background: #ddd; border-color: #ddd; }
+  .btn svg { width: 13px; height: 13px; }
+
+  /* ── CANVAS ── */
+  .canvas-area { background: #050505; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+  .canvas-wrap { position: relative; box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 24px 80px rgba(0,0,0,0.8); border-radius: 4px; overflow: hidden; transition: all 0.3s cubic-bezier(0.4,0,0.2,1); }
+  .canvas-wrap canvas { display: block; image-rendering: pixelated; }
+  .zoom-controls { position: absolute; bottom: 16px; right: 16px; display: flex; gap: 4px; }
+  .zoom-btn { width: 28px; height: 28px; background: var(--surface); border: 1px solid var(--border2); border-radius: 6px; color: var(--text2); font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: var(--transition); }
+  .zoom-btn:hover { color: var(--accent2); border-color: rgba(255,255,255,0.2); }
+  .res-badge { position: absolute; top: 12px; right: 12px; background: rgba(0,0,0,0.6); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; font-size: 10px; color: var(--text3); backdrop-filter: blur(8px); }
+  .download-section { padding: 14px 16px; }
+  .download-section .btn { width: 100%; justify-content: center; padding: 10px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <!-- icon: 3 pills -->
+      <svg width="22" height="26" viewBox="0 0 26 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="0"  y="1" width="8" height="28" rx="4" fill="#1a1a1a" stroke="rgba(255,255,255,0.22)" stroke-width="0.8"/>
+        <rect x="9"  y="1" width="8" height="28" rx="4" fill="#1e1e1e" stroke="rgba(255,255,255,0.28)" stroke-width="0.8"/>
+        <rect x="18" y="1" width="8" height="28" rx="4" fill="#222222" stroke="rgba(255,255,255,0.20)" stroke-width="0.8"/>
+        <rect x="1.5" y="3"  width="2" height="10" rx="1" fill="rgba(255,255,255,0.10)"/>
+        <rect x="10.5" y="3" width="2" height="10" rx="1" fill="rgba(255,255,255,0.10)"/>
+        <rect x="19.5" y="3" width="2" height="10" rx="1" fill="rgba(255,255,255,0.10)"/>
+      </svg>
+      <!-- wordmark + credit stacked -->
+      <div style="display:flex;flex-direction:column;line-height:1;gap:3px;">
+        <span style="font-family:'DM Mono',monospace;font-weight:500;font-size:10px;letter-spacing:0.12em;color:#e8e8e8;">WALLPAPER</span>
+        <span style="font-family:'DM Mono',monospace;font-weight:300;font-size:10px;letter-spacing:0.12em;color:#404040;">GENERATOR</span>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn" onclick="randomize()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        Randomize
+      </button>
+    </div>
+  </header>
+
+  <aside class="panel">
+
+    <!-- MODE -->
+    <div class="section">
+      <div class="section-label">Style Mode</div>
+      <div class="seg" id="modeSwitch">
+        <button class="seg-btn active" data-mode="glass" onclick="setMode('glass',this)">Glassmorphism</button>
+        <button class="seg-btn" data-mode="solid" onclick="setMode('solid',this)">Solid</button>
+        <button class="seg-btn" data-mode="outline" onclick="setMode('outline',this)">Outline</button>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Glow / sheen</span>
+        <label class="toggle"><input type="checkbox" id="toggleGlow" checked onchange="render()"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Grain texture</span>
+        <label class="toggle"><input type="checkbox" id="toggleGrain" checked onchange="render()"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Depth shadow</span>
+        <label class="toggle"><input type="checkbox" id="toggleShadow" checked onchange="render()"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+      </div>
+    </div>
+
+    <!-- SHAPE -->
+    <div class="section">
+      <div class="section-label">Shape</div>
+      <div class="seg" id="shapeSwitch">
+        <button class="seg-btn active" data-shape="pill" onclick="setShape('pill',this)">Pill</button>
+        <button class="seg-btn" data-shape="circle" onclick="setShape('circle',this)">Circle</button>
+        <button class="seg-btn" data-shape="rect" onclick="setShape('rect',this)">Rect</button>
+        <button class="seg-btn" data-shape="diamond" onclick="setShape('diamond',this)">Diamond</button>
+      </div>
+      <div class="slider-row">
+        <span class="slider-label">Count</span>
+        <input type="range" id="slCount" min="1" max="24" value="6" oninput="syncSlider(this,'valCount');render()">
+        <span class="slider-value" id="valCount">6</span>
+      </div>
+      <div class="slider-row">
+        <span class="slider-label">Size</span>
+        <input type="range" id="slSize" min="20" max="200" value="100" oninput="syncSlider(this,'valSize');render()">
+        <span class="slider-value" id="valSize">100</span>
+      </div>
+      <div class="slider-row">
+        <span class="slider-label">Aspect</span>
+        <input type="range" id="slAspect" min="1" max="6" step="0.1" value="2.8" oninput="syncSlider(this,'valAspect');render()">
+        <span class="slider-value" id="valAspect">2.8</span>
+      </div>
+      <div class="slider-row">
+        <span class="slider-label">Spacing</span>
+        <input type="range" id="slSpacing" min="-80" max="100" value="-28" oninput="syncSlider(this,'valSpacing');render()">
+        <span class="slider-value" id="valSpacing">-28</span>
+      </div>
+      <div class="slider-row">
+        <span class="slider-label">Rotation°</span>
+        <input type="range" id="slRotation" min="-90" max="90" value="0" oninput="syncSlider(this,'valRotation');render()">
+        <span class="slider-value" id="valRotation">0</span>
+      </div>
+      <div class="slider-row">
+        <span class="slider-label">Stagger Y</span>
+        <input type="range" id="slAltHeight" min="0" max="1" step="0.01" value="0" oninput="syncSlider(this,'valAltHeight');render()">
+        <span class="slider-value" id="valAltHeight">0</span>
+      </div>
+    </div>
+
+    <!-- ARRANGEMENT -->
+    <div class="section">
+      <div class="section-label">Arrangement</div>
+      <div class="seg" id="arrangSwitch">
+        <button class="seg-btn active" data-arr="row" onclick="setArr('row',this)">Row</button>
+        <button class="seg-btn" data-arr="grid" onclick="setArr('grid',this)">Grid</button>
+        <button class="seg-btn" data-arr="scatter" onclick="setArr('scatter',this)">Scatter</button>
+        <button class="seg-btn" data-arr="radial" onclick="setArr('radial',this)">Radial</button>
+      </div>
+      <div class="slider-row" id="rowGrid" style="display:none">
+        <span class="slider-label">Columns</span>
+        <input type="range" id="slCols" min="1" max="12" value="3" oninput="syncSlider(this,'valCols');render()">
+        <span class="slider-value" id="valCols">3</span>
+      </div>
+      <div class="slider-row">
+        <span class="slider-label">Offset Y</span>
+        <input type="range" id="slOffsetY" min="-100" max="100" value="0" oninput="syncSlider(this,'valOffsetY');render()">
+        <span class="slider-value" id="valOffsetY">0</span>
+      </div>
+      <div class="slider-row">
+        <span class="slider-label">Scale Fade</span>
+        <input type="range" id="slScaleFade" min="0" max="1" step="0.01" value="0" oninput="syncSlider(this,'valScaleFade');render()">
+        <span class="slider-value" id="valScaleFade">0</span>
+      </div>
+    </div>
+
+    <!-- PRESETS -->
+    <div class="section">
+      <div class="section-label">Presets</div>
+
+      <div class="preset-category"><span class="preset-cat-badge cat-glass">GLASS</span></div>
+      <div class="palette-grid" id="glassGrid"></div>
+
+      <div class="preset-category" style="margin-top:4px"><span class="preset-cat-badge cat-solid">SOLID</span></div>
+      <div class="palette-grid" id="solidGrid"></div>
+
+      <!-- SHAPE COLORS -->
+      <div class="section-label" style="margin-top:10px">Shape Colors</div>
+      <div class="seg" id="distSwitch">
+        <button class="seg-btn active" data-dist="cycle" onclick="setDist('cycle',this)">Cycle</button>
+        <button class="seg-btn" data-dist="gradient" onclick="setDist('gradient',this)">Gradient</button>
+        <button class="seg-btn" data-dist="random" onclick="setDist('random',this)">Random</button>
+      </div>
+      <div class="shape-palette-wrap" id="shapePaletteWrap"></div>
+
+      <!-- GLOBAL COLORS -->
+      <div class="section-label">Global Colors</div>
+      <div class="color-row">
+        <div class="color-item">
+          <div class="color-swatch" id="sw-bg" style="background:#000000"><input type="color" id="clBg" value="#000000" oninput="updateSwatch('bg',this);render()"></div>
+          <span class="color-item-label">Background</span>
+          <span class="color-item-hex" id="hx-bg">#000000</span>
+        </div>
+        <div class="color-item">
+          <div class="color-swatch" id="sw-rim" style="background:#8a8a8a"><input type="color" id="clRim" value="#8a8a8a" oninput="updateSwatch('rim',this);render()"></div>
+          <span class="color-item-label">Rim / border</span>
+          <span class="color-item-hex" id="hx-rim">#8a8a8a</span>
+        </div>
+        <div class="color-item">
+          <div class="color-swatch" id="sw-glow" style="background:#ffffff"><input type="color" id="clGlow" value="#ffffff" oninput="updateSwatch('glow',this);render()"></div>
+          <span class="color-item-label">Glow / sheen</span>
+          <span class="color-item-hex" id="hx-glow">#ffffff</span>
+        </div>
+      </div>
+      <div class="slider-row" style="margin-top:8px">
+        <span class="slider-label">Rim width</span>
+        <input type="range" id="slRimW" min="0.5" max="12" step="0.5" value="3" oninput="syncSlider(this,'valRimW');render()">
+        <span class="slider-value" id="valRimW">3</span>
+      </div>
+      <div class="slider-row">
+        <span class="slider-label">Opacity</span>
+        <input type="range" id="slOpacity" min="0.1" max="1" step="0.01" value="1" oninput="syncSlider(this,'valOpacity');render()">
+        <span class="slider-value" id="valOpacity">1</span>
+      </div>
+    </div>
+
+    <!-- EXPORT -->
+    <div class="section">
+      <div class="section-label">Export Size</div>
+      <div class="export-grid">
+        <button class="export-btn sel" onclick="setExport(2560,1440,this)"><strong>Desktop 16:9</strong>2560 × 1440</button>
+        <button class="export-btn" onclick="setExport(2560,1920,this)"><strong>Desktop 4:3</strong>2560 × 1920</button>
+        <button class="export-btn" onclick="setExport(2048,2732,this)"><strong>iPad Portrait</strong>2048 × 2732</button>
+        <button class="export-btn" onclick="setExport(2732,2048,this)"><strong>iPad Landscape</strong>2732 × 2048</button>
+        <button class="export-btn" onclick="setExport(1170,2532,this)"><strong>Mobile Portrait</strong>1170 × 2532</button>
+        <button class="export-btn" onclick="setExport(2532,1170,this)"><strong>Mobile Landscape</strong>2532 × 1170</button>
+        <button class="export-btn" onclick="setExport(3840,2160,this)"><strong>4K Ultra HD</strong>3840 × 2160</button>
+        <button class="export-btn" onclick="setExport(1920,1080,this)"><strong>Full HD</strong>1920 × 1080</button>
+      </div>
+    </div>
+
+    <div class="download-section">
+      <button class="btn btn-primary" onclick="downloadWallpaper()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download Wallpaper
+      </button>
+    </div>
+  </aside>
+
+  <main class="canvas-area" id="canvasArea">
+    <div class="canvas-wrap" id="canvasWrap">
+      <canvas id="preview"></canvas>
+    </div>
+    <div class="res-badge" id="resBadge">2560 × 1440</div>
+    <div class="zoom-controls">
+      <button class="zoom-btn" onclick="zoom(-0.1)">−</button>
+      <button class="zoom-btn" onclick="zoom(0.1)">+</button>
+      <button class="zoom-btn" onclick="resetZoom()" style="width:auto;padding:0 8px;font-size:10px;font-family:inherit">Fit</button>
+    </div>
+  </main>
+
+</div>
+
+<!-- ─── Footer credit ─── -->
+<a href="https://www.instagram.com/kenzchiro" target="_blank" rel="noopener"
+   style="position:fixed;bottom:1.25rem;left:calc(320px + 1.25rem);z-index:9999;
+          font-family:'DM Mono',monospace;font-size:10px;font-weight:300;
+          letter-spacing:0.10em;color:#333;text-decoration:none;
+          transition:color 0.15s;"
+   onmouseover="this.style.color='#888'" onmouseout="this.style.color='#333'">
+  by @kenzchiro
+</a>
+
+<!-- ─── Buy Me a Coffee ─── -->
+<a href="https://www.buymeacoffee.com/kenzchiro" target="_blank" rel="noopener"
+   style="position:fixed;bottom:1.25rem;right:1.25rem;z-index:9999;
+          display:flex;align-items:center;gap:.45rem;
+          background:#FFDD00;color:#000;
+          font-family:'Poppins',sans-serif;font-size:.78rem;font-weight:600;
+          padding:.5rem .9rem;border-radius:2rem;
+          box-shadow:0 2px 10px rgba(0,0,0,.18);
+          text-decoration:none;white-space:nowrap;
+          transition:transform .15s,box-shadow .15s;"
+   onmouseover="this.style.transform='scale(1.05)';this.style.boxShadow='0 4px 16px rgba(0,0,0,.25)'"
+   onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 2px 10px rgba(0,0,0,.18)'">
+  ☕ Buy me a coffee
+</a>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════
+const S = {
+  mode:'glass', shape:'pill', arr:'row',
+  count:6, size:100, aspect:2.8, spacing:-28,
+  rotation:0, cols:3, offsetY:0, scaleFade:0, altHeight:0,
+  bg:'#000000', rim:'#909090', glow:'#ffffff',
+  rimW:3, opacity:1,
+  shapeColors:['#181818','#1a1a22','#181c18','#1e1818','#18181e','#1a1c14'],
+  colorDist:'cycle',
+  _rc:null,
+  exportW:2560, exportH:1440, zoom:1, scatter:null,
+};
+
+// ═══════════════════════════════════════════════════════
+// PRESETS  — each has: tag, name, bg, rim, glow, shapes, mode, dist
+// ═══════════════════════════════════════════════════════
+const PALETTES = [
+
+  // ━━ GLASS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  { tag:'glass', name:'Obsidian',
+    bg:'#000000', rim:'#909090', glow:'#ffffff', mode:'glass', dist:'cycle',
+    shapes:['#181818','#1c1c20','#141418','#1e1818','#14181e','#1c1a12'],
+    chipGrad:'linear-gradient(135deg,#1e1e1e,#3a3a3a,#1a1a1a)' },
+
+  { tag:'glass', name:'Deep Space',
+    bg:'#02010e', rim:'#6655ee', glow:'#ccbbff', mode:'glass', dist:'gradient',
+    shapes:['#08062a','#100a38','#180a40','#0c0830','#140834','#1c083e'],
+    chipGrad:'linear-gradient(135deg,#08062a,#180a40,#6655ee 160%)' },
+
+  { tag:'glass', name:'Aurora',
+    bg:'#000c06', rim:'#22ffaa', glow:'#88ffcc', mode:'glass', dist:'gradient',
+    shapes:['#002818','#003020','#002a2a','#001c28','#002830','#002020'],
+    chipGrad:'linear-gradient(135deg,#002818,#002a2a,#22ffaa 200%)' },
+
+  { tag:'glass', name:'Ember',
+    bg:'#0e0200', rim:'#ff4411', glow:'#ffcc88', mode:'glass', dist:'gradient',
+    shapes:['#300600','#3c0a00','#480e00','#380800','#421000','#2c0600'],
+    chipGrad:'linear-gradient(135deg,#300600,#481000,#ff4411 180%)' },
+
+  { tag:'glass', name:'Amethyst',
+    bg:'#060010', rim:'#bb44ff', glow:'#ffaaff', mode:'glass', dist:'gradient',
+    shapes:['#16002c','#1e0040','#260050','#200038','#1a002e','#240040'],
+    chipGrad:'linear-gradient(135deg,#16002c,#260050,#bb44ff 180%)' },
+
+  { tag:'glass', name:'Arctic',
+    bg:'#010810', rim:'#33aaff', glow:'#aaddff', mode:'glass', dist:'gradient',
+    shapes:['#071624','#091a2e','#051228','#0b1c32','#071828','#0d2036'],
+    chipGrad:'linear-gradient(135deg,#05102a,#0b1c32,#33aaff 180%)' },
+
+  { tag:'glass', name:'Midnight',
+    bg:'#030310', rim:'#5566ff', glow:'#aabbff', mode:'glass', dist:'gradient',
+    shapes:['#0a0a2a','#0e0e38','#120e40','#080828','#0c0a30','#100c3c'],
+    chipGrad:'linear-gradient(135deg,#0a0a2a,#120e40,#5566ff 160%)' },
+
+  { tag:'glass', name:'Malachite',
+    bg:'#000e08', rim:'#44ff88', glow:'#ccffdd', mode:'glass', dist:'gradient',
+    shapes:['#001e0e','#002818','#003020','#002010','#002a18','#001808'],
+    chipGrad:'linear-gradient(135deg,#001808,#003020,#44ff88 180%)' },
+
+  // ━━ SOLID ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  { tag:'solid', name:'Spectrum',
+    bg:'#080808', rim:'#cccccc', glow:'#ffffff', mode:'solid', dist:'gradient',
+    shapes:['#cc2222','#cc7700','#aaaa00','#22aa44','#2255cc','#9922cc'],
+    chipGrad:'linear-gradient(90deg,#cc2222,#cc7700,#aaaa00,#22aa44,#2255cc,#9922cc)' },
+
+  { tag:'solid', name:'Neon Rush',
+    bg:'#050510', rim:'#ffffff', glow:'#ffffff', mode:'solid', dist:'cycle',
+    shapes:['#ff0066','#ff6600','#ccee00','#00dd66','#0066ff','#cc00ff'],
+    chipGrad:'linear-gradient(90deg,#ff0066,#ff6600,#ccee00,#00dd66,#0066ff,#cc00ff)' },
+
+  { tag:'solid', name:'Candy',
+    bg:'#10101a', rim:'#ffffff', glow:'#ffffff', mode:'solid', dist:'cycle',
+    shapes:['#ee3388','#ee8833','#ddcc33','#33cc88','#3388ee','#9933ee'],
+    chipGrad:'linear-gradient(90deg,#ee3388,#ee8833,#ddcc33,#33cc88,#3388ee,#9933ee)' },
+
+  { tag:'solid', name:'Ocean',
+    bg:'#000a14', rim:'#00bbff', glow:'#ccf0ff', mode:'solid', dist:'gradient',
+    shapes:['#003366','#004d99','#0066aa','#0088bb','#00aacc','#005588'],
+    chipGrad:'linear-gradient(90deg,#003366,#0066aa,#00aacc)' },
+
+  { tag:'solid', name:'Forest',
+    bg:'#020a00', rim:'#66dd55', glow:'#ccffaa', mode:'solid', dist:'gradient',
+    shapes:['#0a2800','#1a4400','#2a6600','#3a8800','#226600','#0e3300'],
+    chipGrad:'linear-gradient(90deg,#0a2800,#2a6600,#3a8800)' },
+
+  { tag:'solid', name:'Sunset',
+    bg:'#0a0200', rim:'#ff8844', glow:'#ffeecc', mode:'solid', dist:'gradient',
+    shapes:['#cc0033','#dd3300','#ee6600','#cc4400','#dd2200','#ff7700'],
+    chipGrad:'linear-gradient(90deg,#cc0033,#ee6600,#ff7700)' },
+
+  { tag:'solid', name:'Blush',
+    bg:'#0a0408', rim:'#ff99bb', glow:'#ffddee', mode:'solid', dist:'gradient',
+    shapes:['#4a0a20','#661830','#883040','#774038','#552828','#441020'],
+    chipGrad:'linear-gradient(90deg,#4a0a20,#883040,#ff99bb 200%)' },
+
+  { tag:'solid', name:'Pearl',
+    bg:'#f0ece0', rim:'#aa9977', glow:'#ffffff', mode:'solid', dist:'cycle',
+    shapes:['#e4ddd0','#d8d0c0','#e0d8c8','#ddd5c5','#e8e0d0','#d4ccba'],
+    chipGrad:'linear-gradient(90deg,#d8d0c0,#e8e0d0,#f0ece0)' },
+];
+
+// ═══════════════════════════════════════════════════════
+// COLOR MATH
+// ═══════════════════════════════════════════════════════
+function hexToRgb(h){
+  h=h.replace('#','');
+  return {r:parseInt(h.slice(0,2),16),g:parseInt(h.slice(2,4),16),b:parseInt(h.slice(4,6),16)};
+}
+function rgbToHex({r,g,b}){
+  return '#'+[r,g,b].map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');
+}
+function rgba(hex,a){const c=hexToRgb(hex);return `rgba(${c.r},${c.g},${c.b},${a})`;}
+function lerpRgb(c1,c2,t){return{r:c1.r+(c2.r-c1.r)*t,g:c1.g+(c2.g-c1.g)*t,b:c1.b+(c2.b-c1.b)*t};}
+
+function getShapeColor(idx, total){
+  const cols=S.shapeColors;
+  if(!cols.length) return '#181818';
+  if(cols.length===1) return cols[0];
+  if(S.colorDist==='cycle') return cols[idx%cols.length];
+  if(S.colorDist==='gradient'){
+    const t=total>1?idx/(total-1):0;
+    const seg=t*(cols.length-1);
+    const si=Math.min(Math.floor(seg),cols.length-2);
+    return rgbToHex(lerpRgb(hexToRgb(cols[si]),hexToRgb(cols[si+1]),seg-si));
+  }
+  if(S.colorDist==='random'){
+    if(!S._rc||S._rc.length!==total)
+      S._rc=Array.from({length:total},()=>cols[Math.floor(Math.random()*cols.length)]);
+    return S._rc[idx];
+  }
+  return cols[0];
+}
+
+// ═══════════════════════════════════════════════════════
+// SHAPE PALETTE UI
+// ═══════════════════════════════════════════════════════
+function buildShapePalette(){
+  const wrap=document.getElementById('shapePaletteWrap');
+  wrap.innerHTML='';
+  S.shapeColors.forEach((col,i)=>{
+    const sw=document.createElement('div');
+    sw.className='spc-swatch'; sw.style.background=col;
+    const inp=document.createElement('input');
+    inp.type='color'; inp.value=col;
+    inp.oninput=()=>{S.shapeColors[i]=inp.value;sw.style.background=inp.value;S._rc=null;render();};
+    const rm=document.createElement('div');
+    rm.className='spc-remove'; rm.textContent='×';
+    rm.onclick=e=>{e.stopPropagation();if(S.shapeColors.length<=1)return;S.shapeColors.splice(i,1);S._rc=null;buildShapePalette();render();};
+    sw.appendChild(inp); sw.appendChild(rm); wrap.appendChild(sw);
+  });
+  const add=document.createElement('button');
+  add.className='spc-add'; add.title='Add color'; add.textContent='+';
+  add.onclick=()=>{
+    const last=hexToRgb(S.shapeColors[S.shapeColors.length-1]);
+    const j=()=>Math.round((Math.random()-0.5)*32);
+    S.shapeColors.push(rgbToHex({r:last.r+j(),g:last.g+j(),b:last.b+j()}));
+    S._rc=null; buildShapePalette(); render();
+  };
+  wrap.appendChild(add);
+}
+
+// ═══════════════════════════════════════════════════════
+// PRESET GRID
+// ═══════════════════════════════════════════════════════
+function initPalettes(){
+  const glass=document.getElementById('glassGrid');
+  const solid=document.getElementById('solidGrid');
+  PALETTES.forEach((p,i)=>{
+    const el=document.createElement('div');
+    el.className='palette-chip'+(i===0?' active':'');
+    el.title=p.name;
+
+    el.style.background = p.chipGrad;
+
+    const lbl=document.createElement('div');
+    lbl.className='chip-label'; lbl.textContent=p.name;
+    el.appendChild(lbl);
+    el.onclick=()=>{
+      document.querySelectorAll('.palette-chip').forEach(c=>c.classList.remove('active'));
+      el.classList.add('active'); applyPalette(p);
+    };
+    (p.tag==='glass'?glass:solid).appendChild(el);
+  });
+}
+
+function applyPalette(p){
+  // Apply colors
+  S.bg=p.bg; S.rim=p.rim; S.glow=p.glow;
+  S.shapeColors=[...p.shapes]; S._rc=null;
+  // Apply mode
+  S.mode=p.mode;
+  document.querySelectorAll('#modeSwitch .seg-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===p.mode));
+  // Apply dist
+  S.colorDist=p.dist;
+  document.querySelectorAll('#distSwitch .seg-btn').forEach(b=>b.classList.toggle('active',b.dataset.dist===p.dist));
+  // Sync UI
+  document.getElementById('clBg').value=p.bg;
+  document.getElementById('clRim').value=p.rim;
+  document.getElementById('clGlow').value=p.glow;
+  updateSwatch('bg',{value:p.bg});
+  updateSwatch('rim',{value:p.rim});
+  updateSwatch('glow',{value:p.glow});
+  buildShapePalette(); render();
+}
+
+// ═══════════════════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════════════════
+function syncSlider(el,valId){
+  const v=parseFloat(el.value);
+  document.getElementById(valId).textContent=v%1===0?v:v.toFixed(1);
+  const key=el.id.replace('sl','').toLowerCase();
+  const map={count:'count',size:'size',aspect:'aspect',spacing:'spacing',rotation:'rotation',
+             cols:'cols',offsety:'offsetY',scalefade:'scaleFade',rimw:'rimW',opacity:'opacity',
+             altheight:'altHeight'};
+  if(map[key]!==undefined) S[map[key]]=v;
+}
+function updateSwatch(key,inp){
+  const val=inp.value;
+  S[{bg:'bg',rim:'rim',glow:'glow'}[key]]=val;
+  document.getElementById('sw-'+key).style.background=val;
+  document.getElementById('hx-'+key).textContent=val;
+}
+function setMode(m,btn){S.mode=m;document.querySelectorAll('#modeSwitch .seg-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');render();}
+function setShape(sh,btn){S.shape=sh;document.querySelectorAll('#shapeSwitch .seg-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');render();}
+function setArr(a,btn){
+  S.arr=a;S.scatter=null;
+  document.querySelectorAll('#arrangSwitch .seg-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('rowGrid').style.display=a==='grid'?'flex':'none';
+  render();
+}
+function setDist(d,btn){
+  S.colorDist=d;S._rc=null;
+  document.querySelectorAll('#distSwitch .seg-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');render();
+}
+function setExport(w,h,btn){
+  S.exportW=w;S.exportH=h;
+  document.querySelectorAll('.export-btn').forEach(b=>b.classList.remove('sel'));
+  if(btn) btn.classList.add('sel');
+  document.getElementById('resBadge').textContent=`${w} × ${h}`;
+  resetZoom();render();
+}
+function zoom(d){S.zoom=Math.max(0.05,Math.min(4,S.zoom+d));applyZoom();}
+function resetZoom(){
+  const a=document.getElementById('canvasArea');
+  S.zoom=Math.min((a.clientWidth-40)/S.exportW,(a.clientHeight-40)/S.exportH,1);
+  applyZoom();
+}
+function applyZoom(){
+  const wrap=document.getElementById('canvasWrap');
+  wrap.style.width=(S.exportW*S.zoom)+'px';
+  wrap.style.height=(S.exportH*S.zoom)+'px';
+  const c=document.getElementById('preview');
+  c.style.width='100%'; c.style.height='100%';
+}
+function randomize(){
+  S.count=rand(3,14);S.size=rand(50,160);S.aspect=+(rand(18,45)/10).toFixed(1);
+  S.spacing=rand(-50,60);S.rotation=rand(-45,45);S.offsetY=rand(-60,60);
+  S.scaleFade=+(rand(0,60)/100).toFixed(2);
+  S.altHeight=+(rand(0,70)/100).toFixed(2);
+  S.arr=['row','grid','scatter','radial'][Math.floor(Math.random()*4)];
+  S.shape=['pill','circle','rect','diamond'][Math.floor(Math.random()*4)];
+  S.colorDist=['cycle','gradient','random'][Math.floor(Math.random()*3)];
+  S.scatter=null;S._rc=null;
+  // random preset
+  const rp=PALETTES[Math.floor(Math.random()*PALETTES.length)];
+  S.bg=rp.bg;S.rim=rp.rim;S.glow=rp.glow;S.shapeColors=[...rp.shapes];S.mode=rp.mode;
+  document.querySelectorAll('.palette-chip').forEach(c=>c.classList.remove('active'));
+  document.querySelectorAll('#modeSwitch .seg-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===S.mode));
+  document.querySelectorAll('#distSwitch .seg-btn').forEach(b=>b.classList.toggle('active',b.dataset.dist===S.colorDist));
+  document.querySelectorAll('#arrangSwitch .seg-btn').forEach(b=>b.classList.toggle('active',b.dataset.arr===S.arr));
+  document.querySelectorAll('#shapeSwitch .seg-btn').forEach(b=>b.classList.toggle('active',b.dataset.shape===S.shape));
+  document.getElementById('rowGrid').style.display=S.arr==='grid'?'flex':'none';
+  updateSwatch('bg',{value:S.bg});updateSwatch('rim',{value:S.rim});updateSwatch('glow',{value:S.glow});
+  document.getElementById('clBg').value=S.bg;
+  document.getElementById('clRim').value=S.rim;
+  document.getElementById('clGlow').value=S.glow;
+  [['Count','count'],['Size','size'],['Aspect','aspect'],['Spacing','spacing'],['Rotation','rotation'],['OffsetY','offsetY'],['ScaleFade','scaleFade'],['AltHeight','altHeight']].forEach(([k,sk])=>{
+    const sl=document.getElementById('sl'+k),vl=document.getElementById('val'+k);
+    if(sl){sl.value=S[sk];vl.textContent=Math.round(S[sk]*10)/10;}
+  });
+  buildShapePalette();render();
+}
+function rand(a,b){return Math.floor(Math.random()*(b-a+1))+a;}
+
+// ═══════════════════════════════════════════════════════
+// GRAIN
+// ═══════════════════════════════════════════════════════
+let _grain=null;
+function getGrain(w,h){
+  if(!_grain||_grain.width!==w||_grain.height!==h){
+    _grain=document.createElement('canvas');_grain.width=w;_grain.height=h;
+    const gx=_grain.getContext('2d'),id=gx.createImageData(w,h);
+    for(let i=0;i<id.data.length;i+=4){const v=Math.random()*28|0;id.data[i]=id.data[i+1]=id.data[i+2]=v;id.data[i+3]=16;}
+    gx.putImageData(id,0,0);
+  }
+  return _grain;
+}
+
+// ═══════════════════════════════════════════════════════
+// DRAW
+// ═══════════════════════════════════════════════════════
+function drawPath(ctx,x,y,w,h,shape){
+  ctx.beginPath();
+  if(shape==='pill')      ctx.roundRect(x-w/2,y-h/2,w,h,Math.min(w,h)/2);
+  else if(shape==='circle') ctx.arc(x,y,Math.min(w,h)/2,0,Math.PI*2);
+  else if(shape==='rect')  ctx.roundRect(x-w/2,y-h/2,w,h,Math.min(w,h)*0.06);
+  else if(shape==='diamond'){ctx.moveTo(x,y-h/2);ctx.lineTo(x+w/2,y);ctx.lineTo(x,y+h/2);ctx.lineTo(x-w/2,y);ctx.closePath();}
+}
+
+function drawOne(ctx,cx,cy,w,h,sc,scale){
+  const glowOn =document.getElementById('toggleGlow').checked;
+  const shadowOn=document.getElementById('toggleShadow').checked;
+  const shape=S.shape, rimW=S.rimW;
+
+  ctx.save();
+  ctx.globalAlpha=S.opacity;
+  ctx.translate(cx,cy);
+  ctx.rotate(S.rotation*Math.PI/180);
+  ctx.scale(scale,scale);
+
+  const hw=w/2,hh=h/2;
+
+  // Shadow
+  if(shadowOn&&S.mode!=='outline'){
+    ctx.save();
+    ctx.shadowColor=rgba('#000000',0.75);
+    ctx.shadowBlur=h*0.28;
+    ctx.shadowOffsetX=w*0.04;
+    ctx.shadowOffsetY=h*0.08;
+    drawPath(ctx,0,0,w,h,shape);
+    ctx.fillStyle=rgba(sc,0.01);ctx.fill();
+    ctx.restore();
+  }
+
+  // ── GLASS ──
+  if(S.mode==='glass'){
+    const bg=ctx.createLinearGradient(-hw,-hh,hw*0.5,hh);
+    bg.addColorStop(0,  rgba(sc,0.94));
+    bg.addColorStop(0.3,rgba(sc,0.62));
+    bg.addColorStop(0.7,rgba(sc,0.76));
+    bg.addColorStop(1,  rgba(sc,0.50));
+    drawPath(ctx,0,0,w,h,shape);
+    ctx.fillStyle=bg;ctx.fill();
+
+    if(rimW>0){
+      const rg=ctx.createLinearGradient(-hw,-hh,hw,hh);
+      rg.addColorStop(0,   rgba(S.rim, 0.50));
+      rg.addColorStop(0.08,rgba(S.glow,1.00));
+      rg.addColorStop(0.20,rgba(S.rim, 0.55));
+      rg.addColorStop(0.45,rgba(S.rim, 0.20));
+      rg.addColorStop(0.65,rgba(S.rim, 0.12));
+      rg.addColorStop(0.82,rgba(S.glow,0.70));
+      rg.addColorStop(1,   rgba(S.rim, 0.45));
+      drawPath(ctx,0,0,w,h,shape);
+      ctx.strokeStyle=rg;ctx.lineWidth=rimW;ctx.stroke();
+    }
+    if(glowOn){
+      ctx.save();drawPath(ctx,0,0,w,h,shape);ctx.clip();
+      // diagonal sheen
+      const sh=ctx.createLinearGradient(-hw,-hh,-hw+w*0.55,-hh+h*0.42);
+      sh.addColorStop(0,rgba(S.glow,0.22));sh.addColorStop(0.38,rgba(S.glow,0.06));sh.addColorStop(1,rgba(S.glow,0));
+      ctx.fillStyle=sh;ctx.fillRect(-hw,-hh,w,h);
+      // left stripe
+      const sg=ctx.createLinearGradient(-hw,0,-hw+w*0.14,0);
+      sg.addColorStop(0,rgba(S.glow,0.26));sg.addColorStop(0.5,rgba(S.glow,0.07));sg.addColorStop(1,rgba(S.glow,0));
+      ctx.fillStyle=sg;ctx.fillRect(-hw,-hh*0.88,w*0.14,hh*1.76);
+      // bottom reflection
+      const eg=ctx.createLinearGradient(0,hh-h*0.15,0,hh);
+      eg.addColorStop(0,rgba(S.glow,0));eg.addColorStop(1,rgba(S.glow,0.10));
+      ctx.fillStyle=eg;ctx.fillRect(-hw,hh-h*0.15,w,h*0.15);
+      // center radial
+      const rr=ctx.createRadialGradient(0,-hh*0.18,0,0,0,Math.max(w,h)*0.65);
+      rr.addColorStop(0,rgba(S.glow,0.06));rr.addColorStop(1,rgba(S.glow,0));
+      ctx.fillStyle=rr;ctx.fill();
+      ctx.restore();
+    }
+
+  // ── SOLID ──
+  } else if(S.mode==='solid'){
+    const sg=ctx.createLinearGradient(-hw,-hh,hw*0.4,hh);
+    sg.addColorStop(0,rgba(sc,1));
+    sg.addColorStop(1,rgba(S.rim,0.5));
+    drawPath(ctx,0,0,w,h,shape);
+    ctx.fillStyle=sg;ctx.fill();
+    if(rimW>0){drawPath(ctx,0,0,w,h,shape);ctx.strokeStyle=rgba(S.rim,0.75);ctx.lineWidth=rimW;ctx.stroke();}
+    if(glowOn){
+      ctx.save();drawPath(ctx,0,0,w,h,shape);ctx.clip();
+      const ss=ctx.createLinearGradient(-hw,-hh,hw*0.25,hh*0.25);
+      ss.addColorStop(0,rgba(S.glow,0.20));ss.addColorStop(1,rgba(S.glow,0));
+      ctx.fillStyle=ss;ctx.fill();ctx.restore();
+    }
+
+  // ── OUTLINE ──
+  } else {
+    drawPath(ctx,0,0,w,h,shape);
+    const og=ctx.createLinearGradient(-hw,-hh,hw,hh);
+    og.addColorStop(0,rgba(S.glow,0.9));og.addColorStop(0.5,rgba(sc,0.7));og.addColorStop(1,rgba(S.glow,0.5));
+    ctx.strokeStyle=og;ctx.lineWidth=rimW*1.5;ctx.stroke();
+    if(glowOn){
+      ctx.save();ctx.shadowColor=rgba(sc,0.5);ctx.shadowBlur=16;
+      drawPath(ctx,0,0,w,h,shape);ctx.strokeStyle=rgba(sc,0.18);ctx.lineWidth=rimW*1.5;ctx.stroke();ctx.restore();
+    }
+  }
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════════
+// LAYOUT
+// ═══════════════════════════════════════════════════════
+function computePositions(W,H){
+  const n=S.count, px=W/1000;
+  const fw=S.size*px, fh=fw*Math.max(1,S.aspect);
+  const gap=S.spacing*px, offY=S.offsetY*px;
+  const alt=S.altHeight||0;
+  // Stagger: even index shifts up, odd shifts down (opposite Y per adjacent pill)
+  const staggerY=(i)=> (i%2===0 ? -1 : 1) * alt * fh * 0.5;
+  const pos=[];
+
+  if(S.arr==='row'){
+    const step=fw+gap, totalW=step*(n-1)+fw;
+    const sx=W/2-totalW/2+fw/2;
+    for(let i=0;i<n;i++){
+      const fade=S.scaleFade>0?1-Math.abs(i-(n-1)/2)/((n-1)/2+0.001)*S.scaleFade:1;
+      pos.push({x:sx+i*step, y:H/2+offY+staggerY(i), w:fw, h:fh, sc:Math.max(0.05,fade)});
+    }
+  } else if(S.arr==='grid'){
+    const cols=Math.max(1,S.cols|0), rows=Math.ceil(n/cols);
+    const sx=fw+gap, sy=fh+gap;
+    const totW=sx*(cols-1)+fw, totH=sy*(rows-1)+fh;
+    let idx=0;
+    for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
+      if(idx>=n) break;
+      const di=Math.hypot(c-(cols-1)/2,r-(rows-1)/2);
+      const fade=S.scaleFade>0?1-di/Math.hypot(cols,rows)*S.scaleFade:1;
+      // checkerboard: (r+c)%2 gives alternating pattern across grid
+      const ay=((r+c)%2===0 ? -1 : 1) * alt * fh * 0.5;
+      pos.push({x:W/2-totW/2+fw/2+c*sx, y:H/2-totH/2+fh/2+r*sy+offY+ay, w:fw, h:fh, sc:Math.max(0.05,fade)});
+      idx++;
+    }
+  } else if(S.arr==='scatter'){
+    if(!S.scatter||S.scatter.length!==n)
+      S.scatter=Array.from({length:n},()=>({rx:Math.random()*0.8+0.1,ry:Math.random()*0.8+0.1,rs:Math.random()*0.5+0.75}));
+    for(let i=0;i<n;i++){
+      const p=S.scatter[i];
+      const fade=S.scaleFade>0?(1-Math.abs(p.rx-0.5)*S.scaleFade*2):1;
+      pos.push({x:p.rx*W, y:p.ry*H+offY+staggerY(i), w:fw*p.rs, h:fh*p.rs, sc:Math.max(0.05,fade)});
+    }
+  } else if(S.arr==='radial'){
+    const radius=Math.min(W,H)*0.3;
+    for(let i=0;i<n;i++){
+      const a=(i/n)*Math.PI*2-Math.PI/2;
+      const fade=S.scaleFade>0?1-Math.abs(Math.sin(a))*S.scaleFade:1;
+      pos.push({x:W/2+Math.cos(a)*radius, y:H/2+Math.sin(a)*radius+offY+staggerY(i), w:fw, h:fh, sc:Math.max(0.05,fade)});
+    }
+  }
+  return pos;
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════
+function render(){
+  const canvas=document.getElementById('preview');
+  const W=S.exportW,H=S.exportH;
+  canvas.width=W;canvas.height=H;
+  applyZoom();
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle=S.bg;ctx.fillRect(0,0,W,H);
+  // Vignette
+  const vig=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,Math.max(W,H)*0.72);
+  vig.addColorStop(0,'rgba(0,0,0,0)');vig.addColorStop(1,'rgba(0,0,0,0.45)');
+  ctx.fillStyle=vig;ctx.fillRect(0,0,W,H);
+  const positions=computePositions(W,H);
+  positions.forEach((p,i)=>drawOne(ctx,p.x,p.y,p.w,p.h,getShapeColor(i,positions.length),p.sc));
+  if(document.getElementById('toggleGrain').checked) ctx.drawImage(getGrain(W,H),0,0);
+}
+
+function downloadWallpaper(){
+  const a=document.createElement('a');
+  a.href=document.getElementById('preview').toDataURL('image/png');
+  a.download=`wallpaper-${S.exportW}x${S.exportH}.png`;
+  a.click();
+}
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+initPalettes();
+buildShapePalette();
+resetZoom();
+render();
+window.addEventListener('resize',()=>{resetZoom();});
+</script>
+</body>
+</html>

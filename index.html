@@ -369,6 +369,11 @@
         <span class="slider-value" id="valRimW">3</span>
       </div>
       <div class="slider-row">
+        <span class="slider-label">Top highlight</span>
+        <input type="range" id="slTopHighlight" min="0" max="60" step="1" value="18" oninput="syncSlider(this,'valTopHighlight');render()">
+        <span class="slider-value" id="valTopHighlight">18%</span>
+      </div>
+      <div class="slider-row">
         <span class="slider-label">Opacity</span>
         <input type="range" id="slOpacity" min="0.1" max="1" step="0.01" value="1" oninput="syncSlider(this,'valOpacity');render()">
         <span class="slider-value" id="valOpacity">1</span>
@@ -429,7 +434,7 @@ const S = {
   count:6, size:100, aspect:2.8, spacing:-28,
   rotation:0, cols:3, offsetY:0, scaleFade:0, altHeight:0,
   bg:'#000000', rim:'#909090', glow:'#ffffff',
-  rimW:3, opacity:1,
+  rimW:3, opacity:1, topHighlight:18,
   shapeColors:['#181818','#1a1a22','#181c18','#1e1818','#18181e','#1a1c14'],
   colorDist:'cycle',
   _rc:null,
@@ -635,10 +640,11 @@ function applyPalette(p){
 // ═══════════════════════════════════════════════════════
 function syncSlider(el,valId){
   const v=parseFloat(el.value);
-  document.getElementById(valId).textContent=v%1===0?v:v.toFixed(1);
+  const pctIds={'valTopHighlight':true};
+  document.getElementById(valId).textContent=(pctIds[valId]?v+'%':(v%1===0?v:v.toFixed(1)));
   const key=el.id.replace('sl','').toLowerCase();
   const map={count:'count',size:'size',aspect:'aspect',spacing:'spacing',rotation:'rotation',
-             cols:'cols',offsety:'offsetY',scalefade:'scaleFade',rimw:'rimW',opacity:'opacity',
+             cols:'cols',offsety:'offsetY',scalefade:'scaleFade',rimw:'rimW',opacity:'opacity',tophighlight:'topHighlight',
              altheight:'altHeight'};
   if(map[key]!==undefined) S[map[key]]=v;
 }
@@ -802,6 +808,37 @@ function drawOne(ctx,cx,cy,w,h,sc,scale){
       const rr=ctx.createRadialGradient(0,-hh*0.18,0,0,0,Math.max(w,h)*0.65);
       rr.addColorStop(0,rgba(S.glow,0.06));rr.addColorStop(1,rgba(S.glow,0));
       ctx.fillStyle=rr;ctx.fill();
+      // top highlight reflection
+      const ht=(S.topHighlight||0)/100;
+      if(ht>0){
+        const th=h*ht;
+        // 1. full-width soft band — main brightness
+        const tg=ctx.createLinearGradient(0,-hh,0,-hh+th);
+        tg.addColorStop(0,    rgba(S.glow,0.88));
+        tg.addColorStop(0.12, rgba(S.glow,0.78));
+        tg.addColorStop(0.30, rgba(S.glow,0.55));
+        tg.addColorStop(0.55, rgba(S.glow,0.28));
+        tg.addColorStop(0.78, rgba(S.glow,0.09));
+        tg.addColorStop(1,    rgba(S.glow,0));
+        ctx.fillStyle=tg;ctx.fillRect(-hw,-hh,w,th);
+        // 2. centre lens boost — wide oval radial
+        ctx.save();
+        ctx.translate(0,-hh);
+        ctx.scale(1,(th*0.9)/hw);
+        const lg=ctx.createRadialGradient(0,0,0,0,0,hw);
+        lg.addColorStop(0,   rgba(S.glow,0.40));
+        lg.addColorStop(0.55,rgba(S.glow,0.10));
+        lg.addColorStop(1,   rgba(S.glow,0));
+        ctx.fillStyle=lg;ctx.fillRect(-hw,0,w,hw);
+        ctx.restore();
+        // 3. sharp specular line at very top edge (full width)
+        const sl=h*0.035;
+        const sg2=ctx.createLinearGradient(0,-hh,0,-hh+sl);
+        sg2.addColorStop(0,  rgba(S.glow,1.00));
+        sg2.addColorStop(0.5,rgba(S.glow,0.55));
+        sg2.addColorStop(1,  rgba(S.glow,0));
+        ctx.fillStyle=sg2;ctx.fillRect(-hw,-hh,w,sl);
+      }
       ctx.restore();
     }
 
